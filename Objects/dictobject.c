@@ -3309,7 +3309,7 @@ typedef struct {
 
 // customized functions
 Py_ssize_t uniform(Py_ssize_t m){
-    srand(time(NULL));
+//    srand(time(NULL));
     return rand() % m;
 }
 
@@ -3347,7 +3347,7 @@ void freePermutationArray(Py_ssize_t **arr){
 static PyObject *
 dictiter_new(PyDictObject *dict, PyTypeObject *itertype)
 {
-//    printf("new iter created \n");
+//    printf("Create new iterator \n");
     dictiterobject *di;
     di = PyObject_GC_New(dictiterobject, itertype);
     if (di == NULL)
@@ -3376,6 +3376,7 @@ dictiter_dealloc(dictiterobject *di)
 {
     Py_XDECREF(di->di_dict);
     Py_XDECREF(di->di_result);
+//    printf("Dealloc iterator\n\n");
     freePermutationArray(&di->permutation);
     PyObject_GC_Del(di);
 }
@@ -3413,6 +3414,9 @@ static PyMethodDef dictiter_methods[] = {
     {NULL,              NULL}           /* sentinel */
 };
 
+void printIterDetail(dictiterobject *di){
+    printf("di_used: %li\ndi_pos: %li\nlen: %li\npermutation[di_pos]: %li\n", di->di_used, di->di_pos, di->len, di->permutation[di->di_pos]);
+}
 
 static PyObject*
 dictiter_iternextkey(dictiterobject *di)
@@ -3433,11 +3437,13 @@ dictiter_iternextkey(dictiterobject *di)
         return NULL;
     }
 
-    i = di->permutation[di->di_pos]; // index
+//    i = di->di_pos;
+    i = di->di_pos >= di->di_used ? 0 : di->permutation[di->di_pos]; // index
     k = d->ma_keys;
     assert(i >= 0);
     if (d->ma_values) { // if it is combined table
-        if (i >= d->ma_used)
+//        if (i >= d->ma_used)
+        if(di->di_pos >= d->ma_used)
             goto fail;
         key = DK_ENTRIES(k)[i].me_key;
         assert(d->ma_values[i] != NULL);
@@ -3449,17 +3455,22 @@ dictiter_iternextkey(dictiterobject *di)
             entry_ptr++;
             i++;
         }
-        if (i >= n)
+//        if (i >= n)
+        if(di->di_pos >= n)
             goto fail;
         key = entry_ptr->me_key;
     }
-    di->di_pos = i+1;
+//    printIterDetail(di);
+
+//    di->di_pos = i+1;
+    di->di_pos += 1;
     di->len--;
     Py_INCREF(key);
     return key;
 
 fail:
     di->di_dict = NULL;
+//    printf("End iterator\n");
     freePermutationArray(&di->permutation);
     Py_DECREF(d);
     return NULL;
