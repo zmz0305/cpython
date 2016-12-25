@@ -3439,8 +3439,10 @@ dictiter_iternextkey(dictiterobject *di)
         return NULL;
     }
 
+    if(di->di_pos >= di->di_used)
+        goto fail;
 //    i = di->di_pos;
-    i = di->di_pos >= di->di_used ? 0 : di->permutation[di->di_pos]; // index
+    i = di->permutation[di->di_pos]; // index
     k = d->ma_keys;
     assert(i >= 0);
     if (d->ma_values) { // if it is combined table
@@ -3473,7 +3475,7 @@ dictiter_iternextkey(dictiterobject *di)
 fail:
     di->di_dict = NULL;
 //    printf("End iterator\n");
-    freePermutationArray(&di->permutation);
+//    freePermutationArray(&di->permutation);
     Py_DECREF(d);
     return NULL;
 }
