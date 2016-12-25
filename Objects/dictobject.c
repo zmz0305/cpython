@@ -3307,9 +3307,11 @@ typedef struct {
     Py_ssize_t *permutation; // holds indices for random lookup
 } dictiterobject;
 
-// customized functions
+/***
+ * the next 5 customized functions implement a random permutation function
+ * which is used to get a generated random order array for random iteration
+ */
 Py_ssize_t uniform(Py_ssize_t m){
-//    srand(time(NULL));
     return rand() % m;
 }
 
