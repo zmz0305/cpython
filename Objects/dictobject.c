@@ -110,6 +110,7 @@ converting the dict to the combined table.
  */
 #define PyDict_MINSIZE 8
 
+#include <Include/Python.h>
 #include "Python.h"
 #include "dict-common.h"
 #include "stringlib/eq.h"    /* to get unicode_eq() */
@@ -2918,6 +2919,17 @@ dict_popitem(PyDictObject *mp)
     return res;
 }
 
+int py_visit(PyObject *op, visitproc visit, void *arg){
+    do {
+        if (op) {
+            int vret = visit((PyObject *)(op), arg);
+            if (vret)
+                return vret;
+        }
+    } while (0);
+    return 0;
+}
+
 static int
 dict_traverse(PyObject *op, visitproc visit, void *arg)
 {
@@ -3288,15 +3300,54 @@ PyDict_DelItemString(PyObject *v, const char *key)
 typedef struct {
     PyObject_HEAD
     PyDictObject *di_dict; /* Set to NULL when iterator is exhausted */
-    Py_ssize_t di_used;
+    Py_ssize_t di_used; // init with dictionary size
     Py_ssize_t di_pos;
     PyObject* di_result; /* reusable result tuple for iteritems */
-    Py_ssize_t len;
+    Py_ssize_t len; // init with dictionary size, decrease after each iteration
+    Py_ssize_t *permutation; // holds indices for random lookup
 } dictiterobject;
+
+// customized functions
+Py_ssize_t uniform(Py_ssize_t m){
+    srand(time(NULL));
+    return rand() % m;
+}
+
+void swap(Py_ssize_t *a, Py_ssize_t *b){
+    Py_ssize_t temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+void permute(Py_ssize_t permutation[], Py_ssize_t n){
+    Py_ssize_t i;
+    for(i = 0; i <= n-2; i++){
+        Py_ssize_t j = uniform(n-i);
+        swap(&permutation[i], &permutation[i+j]);
+    }
+}
+
+Py_ssize_t *getPermutationArray(Py_ssize_t len){
+    Py_ssize_t *arr = malloc(sizeof(Py_ssize_t) * len);
+    Py_ssize_t i;
+    for(i = 0; i < len; i++){
+        arr[i] = i;
+    }
+    permute(arr, len);
+    return arr;
+}
+
+void freePermutationArray(Py_ssize_t **arr){
+    if(arr){
+        free(*arr);
+        *arr = NULL;
+    }
+}
 
 static PyObject *
 dictiter_new(PyDictObject *dict, PyTypeObject *itertype)
 {
+//    printf("new iter created \n");
     dictiterobject *di;
     di = PyObject_GC_New(dictiterobject, itertype);
     if (di == NULL)
@@ -3306,6 +3357,7 @@ dictiter_new(PyDictObject *dict, PyTypeObject *itertype)
     di->di_used = dict->ma_used;
     di->di_pos = 0;
     di->len = dict->ma_used;
+    di->permutation = getPermutationArray(dict->ma_used);
     if (itertype == &PyDictIterItem_Type) {
         di->di_result = PyTuple_Pack(2, Py_None, Py_None);
         if (di->di_result == NULL) {
@@ -3324,6 +3376,7 @@ dictiter_dealloc(dictiterobject *di)
 {
     Py_XDECREF(di->di_dict);
     Py_XDECREF(di->di_result);
+    freePermutationArray(&di->permutation);
     PyObject_GC_Del(di);
 }
 
@@ -3360,12 +3413,13 @@ static PyMethodDef dictiter_methods[] = {
     {NULL,              NULL}           /* sentinel */
 };
 
+
 static PyObject*
 dictiter_iternextkey(dictiterobject *di)
 {
     PyObject *key;
-    Py_ssize_t i;
-    PyDictKeysObject *k;
+    Py_ssize_t i; // index
+    PyDictKeysObject *k; // all the keys?
     PyDictObject *d = di->di_dict;
 
     if (d == NULL)
@@ -3379,16 +3433,16 @@ dictiter_iternextkey(dictiterobject *di)
         return NULL;
     }
 
-    i = di->di_pos;
+    i = di->permutation[di->di_pos]; // index
     k = d->ma_keys;
     assert(i >= 0);
-    if (d->ma_values) {
+    if (d->ma_values) { // if it is combined table
         if (i >= d->ma_used)
             goto fail;
         key = DK_ENTRIES(k)[i].me_key;
         assert(d->ma_values[i] != NULL);
     }
-    else {
+    else { // if it is splited table
         Py_ssize_t n = k->dk_nentries;
         PyDictKeyEntry *entry_ptr = &DK_ENTRIES(k)[i];
         while (i < n && entry_ptr->me_value == NULL) {
@@ -3406,6 +3460,7 @@ dictiter_iternextkey(dictiterobject *di)
 
 fail:
     di->di_dict = NULL;
+    freePermutationArray(&di->permutation);
     Py_DECREF(d);
     return NULL;
 }
