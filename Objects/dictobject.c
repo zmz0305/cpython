@@ -110,7 +110,7 @@ converting the dict to the combined table.
  */
 #define PyDict_MINSIZE 8
 
-#include <Include/Python.h>
+#include <include/Python.h>
 #include "Python.h"
 #include "dict-common.h"
 #include "stringlib/eq.h"    /* to get unicode_eq() */
@@ -2919,17 +2919,6 @@ dict_popitem(PyDictObject *mp)
     return res;
 }
 
-int py_visit(PyObject *op, visitproc visit, void *arg){
-    do {
-        if (op) {
-            int vret = visit((PyObject *)(op), arg);
-            if (vret)
-                return vret;
-        }
-    } while (0);
-    return 0;
-}
-
 static int
 dict_traverse(PyObject *op, visitproc visit, void *arg)
 {
@@ -3349,7 +3338,6 @@ void freePermutationArray(Py_ssize_t **arr){
 static PyObject *
 dictiter_new(PyDictObject *dict, PyTypeObject *itertype)
 {
-//    printf("Create new iterator \n");
     dictiterobject *di;
     di = PyObject_GC_New(dictiterobject, itertype);
     if (di == NULL)
@@ -3378,7 +3366,6 @@ dictiter_dealloc(dictiterobject *di)
 {
     Py_XDECREF(di->di_dict);
     Py_XDECREF(di->di_result);
-//    printf("Dealloc iterator\n\n");
     freePermutationArray(&di->permutation);
     PyObject_GC_Del(di);
 }
@@ -3425,7 +3412,7 @@ dictiter_iternextkey(dictiterobject *di)
 {
     PyObject *key;
     Py_ssize_t i; // index
-    PyDictKeysObject *k; // all the keys?
+    PyDictKeysObject *k;
     PyDictObject *d = di->di_dict;
 
     if (d == NULL)
@@ -3441,12 +3428,10 @@ dictiter_iternextkey(dictiterobject *di)
 
     if(di->di_pos >= di->di_used)
         goto fail;
-//    i = di->di_pos;
     i = di->permutation[di->di_pos]; // index
     k = d->ma_keys;
     assert(i >= 0);
     if (d->ma_values) { // if it is combined table
-//        if (i >= d->ma_used)
         if(di->di_pos >= d->ma_used)
             goto fail;
         key = DK_ENTRIES(k)[i].me_key;
@@ -3459,14 +3444,11 @@ dictiter_iternextkey(dictiterobject *di)
             entry_ptr++;
             i++;
         }
-//        if (i >= n)
         if(di->di_pos >= n)
             goto fail;
         key = entry_ptr->me_key;
     }
-//    printIterDetail(di);
 
-//    di->di_pos = i+1;
     di->di_pos += 1;
     di->len--;
     Py_INCREF(key);
@@ -3474,8 +3456,6 @@ dictiter_iternextkey(dictiterobject *di)
 
 fail:
     di->di_dict = NULL;
-//    printf("End iterator\n");
-//    freePermutationArray(&di->permutation);
     Py_DECREF(d);
     return NULL;
 }
