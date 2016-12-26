@@ -13,7 +13,12 @@ class TestStringMethods(unittest.TestCase):
 		return s
 
 	def setUp(self):
-		self.dicts = [{}, {'a': 0}, {'a': 0 , 'b': 1, 'c': 2, 'd': 3, 'e': 4}]
+		self.dicts = [
+			{},
+			{'a': 0}, 
+			{'a': 0 , 'b': 1, 'c': 2, 'd': 3, 'e': 4}
+		]
+
 		for d in self.dicts:
 			for key in d:
 				assert isinstance(key, str), "For the purpose of only testing traverse order, keys must be in string type"
