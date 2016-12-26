@@ -3304,12 +3304,18 @@ Py_ssize_t uniform(Py_ssize_t m){
     return rand() % m;
 }
 
+/* typical swap */
 void swap(Py_ssize_t *a, Py_ssize_t *b){
     Py_ssize_t temp = *a;
     *a = *b;
     *b = temp;
 }
 
+/**
+ * to permutate elements in the permutation array
+ * @param permutation the permutation array
+ * @param n array length
+ */
 void permute(Py_ssize_t permutation[], Py_ssize_t n){
     Py_ssize_t i;
     for(i = 0; i <= n-2; i++){
@@ -3318,6 +3324,11 @@ void permute(Py_ssize_t permutation[], Py_ssize_t n){
     }
 }
 
+/***
+ * generate an array contains randomly permuted elements
+ * @param len length of array
+ * @return starting pointer of the array
+ */
 Py_ssize_t *getPermutationArray(Py_ssize_t len){
     Py_ssize_t *arr = malloc(sizeof(Py_ssize_t) * len);
     Py_ssize_t i;
@@ -3328,6 +3339,10 @@ Py_ssize_t *getPermutationArray(Py_ssize_t len){
     return arr;
 }
 
+/***
+ * free the randomly permuted array
+ * @param arr pointer to the array pointer
+ */
 void freePermutationArray(Py_ssize_t **arr){
     if(arr){
         free(*arr);
