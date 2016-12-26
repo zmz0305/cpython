@@ -44,6 +44,12 @@ class TestStringMethods(unittest.TestCase):
 		for d in self.dicts:
 			keys = set(d.keys())
 			key_list = sorted(list(self.toStr(d)))
+			if(len(d) == 0):
+				self.assertEqual(keys, set([]))
+				self.assertEqual(key_list, [])
+			if(len(d) == 1):
+				self.assertEqual(keys, set(['a']))
+				self.assertEqual(key_list, ['a'])
 			if(len(d) == 5):
 				self.assertEqual(keys, set(['a', 'b', 'c', 'd', 'e']))
 				self.assertEqual(key_list, ['a', 'b', 'c', 'd', 'e'])
