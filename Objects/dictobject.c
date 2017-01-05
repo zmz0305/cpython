@@ -3300,12 +3300,14 @@ typedef struct {
  * the next 5 customized functions implement a random permutation function
  * which is used to get a generated random order array for random iteration
  */
-Py_ssize_t uniform(Py_ssize_t m){
+Py_ssize_t
+uniform(Py_ssize_t m){
     return rand() % m;
 }
 
 /* typical swap */
-void swap(Py_ssize_t *a, Py_ssize_t *b){
+void
+swap(Py_ssize_t *a, Py_ssize_t *b){
     Py_ssize_t temp = *a;
     *a = *b;
     *b = temp;
@@ -3316,7 +3318,8 @@ void swap(Py_ssize_t *a, Py_ssize_t *b){
  * @param permutation the permutation array
  * @param n array length
  */
-void permute(Py_ssize_t permutation[], Py_ssize_t n){
+void
+permute(Py_ssize_t permutation[], Py_ssize_t n){
     Py_ssize_t i;
     for(i = 0; i <= n-2; i++){
         Py_ssize_t j = uniform(n-i);
@@ -3329,11 +3332,18 @@ void permute(Py_ssize_t permutation[], Py_ssize_t n){
  * @param len length of array
  * @return starting pointer of the array
  */
-Py_ssize_t *getPermutationArray(Py_ssize_t len){
+Py_ssize_t
+*getPermutationArray(Py_ssize_t len){
     Py_ssize_t *arr = malloc(sizeof(Py_ssize_t) * len);
     Py_ssize_t i;
     for(i = 0; i < len; i++){
         arr[i] = i;
+    }
+    char *seed = getenv("PY_SRAND");
+    if(seed) {
+        srand(atoi(seed));
+    } else {
+        srand(0);
     }
     permute(arr, len);
     return arr;
@@ -3343,7 +3353,8 @@ Py_ssize_t *getPermutationArray(Py_ssize_t len){
  * free the randomly permuted array
  * @param arr pointer to the array pointer
  */
-void freePermutationArray(Py_ssize_t **arr){
+void
+freePermutationArray(Py_ssize_t **arr){
     if(arr){
         free(*arr);
         *arr = NULL;
@@ -3418,7 +3429,9 @@ static PyMethodDef dictiter_methods[] = {
     {NULL,              NULL}           /* sentinel */
 };
 
-void printIterDetail(dictiterobject *di){
+/* Helper function to print permutated index information */
+void
+printIterDetail(dictiterobject *di){
     printf("di_used: %li\ndi_pos: %li\nlen: %li\npermutation[di_pos]: %li\n", di->di_used, di->di_pos, di->len, di->permutation[di->di_pos]);
 }
 
