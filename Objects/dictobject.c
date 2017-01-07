@@ -109,6 +109,10 @@ converting the dict to the combined table.
  */
 #define PyDict_MINSIZE 8
 
+#include <assert.h>
+#include <include/Python.h>
+#include <python2.7/dictobject.h>
+#include <Include/Python.h>
 #include "Python.h"
 #include "dict-common.h"
 #include "stringlib/eq.h"    /* to get unicode_eq() */
@@ -3310,6 +3314,12 @@ PyDict_DelItemString(PyObject *v, const char *key)
     return err;
 }
 
+/* struct to hold the permutated traversal array*/
+typedef struct {
+    PyDictKeyEntry **arr;
+    Py_ssize_t len;
+} permutation;
+
 /* Dictionary iterator types */
 
 typedef struct {
@@ -3318,8 +3328,108 @@ typedef struct {
     Py_ssize_t di_used;
     Py_ssize_t di_pos;
     PyObject* di_result; /* reusable result tuple for iteritems */
+    permutation *permutation;
     Py_ssize_t len;
+
 } dictiterobject;
+
+/***
+ * the next 5 customized functions implement a random permutation function
+ * which is used to get a generated random order array for random iteration
+ */
+Py_ssize_t
+uniform(Py_ssize_t m){
+    return rand() % m;
+}
+
+/* typical swap */
+void
+swap(PyDictKeyEntry **a, PyDictKeyEntry **b){
+    PyDictKeyEntry *temp = *a;
+    *a = *b;
+    *b = temp;
+}
+
+/**
+ * to permutate elements in the permutation array
+ * @param permutation the permutation array
+ * @param n array length
+ */
+void
+permute(PyDictKeyEntry *permutation[], Py_ssize_t n){
+    Py_ssize_t i;
+    for(i = 0; i <= n-2; i++){
+        Py_ssize_t j = uniform(n-i);
+        swap(&permutation[i], &permutation[i+j]);
+    }
+}
+
+/***
+ * permute the order of elements in an array with specified
+ * seed from environment variable PY_SRAND
+ * @param arr the array to permute
+ * @param len length of array
+ * @return starting pointer of the array
+ */
+void
+permute_array(PyDictKeyEntry **arr, Py_ssize_t len){
+    Py_ssize_t i;
+    char *seed = getenv("PY_SRAND");
+    if(seed) {
+        srand(atoi(seed));
+    } else {
+        srand(0);
+    }
+    permute(arr, len);
+}
+
+permutation *
+get_permutation(PyDictObject *dict){
+    permutation *res = malloc(sizeof(permutation));
+    Py_ssize_t i, n, arr_idx;
+    PyDictKeysObject *k;
+    i = 0;
+    arr_idx = 0;
+    k = dict->ma_keys;
+    n = k->dk_nentries;
+    PyDictKeyEntry **res_arr = malloc(sizeof(PyDictKeyEntry) * n);
+    for(Py_ssize_t a = 0; a < n; a++){
+        res_arr[n] = NULL;
+    }
+    while(i < n){
+        assert(arr_idx < n);
+        PyDictKeyEntry *entry_ptr = &DK_ENTRIES(k)[i];
+        while(i < n && entry_ptr->me_value == NULL){
+            entry_ptr++;
+            i++;
+        }
+        if(i < n) {
+            res_arr[arr_idx] = entry_ptr;
+            arr_idx++;
+        }
+        i++;
+    }
+    permute_array(res_arr, arr_idx);
+    res->arr = res_arr;
+    res->len = arr_idx;
+    return res;
+}
+
+/***
+ * free the randomly permuted array
+ * @param arr pointer to the array pointer
+ */
+void
+freePermutation(permutation **per){
+    if(per){
+        if((*per)->arr) {
+            free((*per)->arr);
+        }
+        free(*per);
+        *per = NULL;
+    }
+}
+
 
 static PyObject *
 dictiter_new(PyDictObject *dict, PyTypeObject *itertype)
@@ -3333,6 +3443,7 @@ dictiter_new(PyDictObject *dict, PyTypeObject *itertype)
     di->di_used = dict->ma_used;
     di->di_pos = 0;
     di->len = dict->ma_used;
+    di->permutation = get_permutation(dict);
     if (itertype == &PyDictIterItem_Type) {
         di->di_result = PyTuple_Pack(2, Py_None, Py_None);
         if (di->di_result == NULL) {
@@ -3387,13 +3498,20 @@ static PyMethodDef dictiter_methods[] = {
     {NULL,              NULL}           /* sentinel */
 };
 
+/* Helper function to print permutated index information */
+void
+printIterDetail(dictiterobject *di){
+    printf("di_used: %li\ndi_pos: %li\nlen: %li\npermutation[di_pos]: %p\n", di->di_used, di->di_pos, di->len, di->permutation->arr[di->di_pos]);
+}
+
 static PyObject*
 dictiter_iternextkey(dictiterobject *di)
 {
     PyObject *key;
-    Py_ssize_t i, n;
+    Py_ssize_t i, n, combined_index;
     PyDictKeysObject *k;
     PyDictObject *d = di->di_dict;
+    permutation *per;
 
     if (d == NULL)
         return NULL;
@@ -3405,10 +3523,12 @@ dictiter_iternextkey(dictiterobject *di)
         di->di_used = -1; /* Make this state sticky */
         return NULL;
     }
-
+    combined_index = di->di_pos;
     i = di->di_pos;
     k = d->ma_keys;
     n = k->dk_nentries;
+    per = di->permutation;
+    assert(per->len == di->len);
     if (d->ma_values) {
         PyObject **value_ptr = &d->ma_values[i];
         while (i < n && *value_ptr == NULL) {
@@ -3419,19 +3539,20 @@ dictiter_iternextkey(dictiterobject *di)
             goto fail;
         key = DK_ENTRIES(k)[i].me_key;
     }
+
     else {
-        PyDictKeyEntry *entry_ptr = &DK_ENTRIES(k)[i];
-        while (i < n && entry_ptr->me_value == NULL) {
-            entry_ptr++;
-            i++;
-        }
-        if (i >= n)
+        if(di->len <= 0)
             goto fail;
+        PyDictKeyEntry *entry_ptr = di->permutation->arr[combined_index];
+        if(entry_ptr == NULL) printf("entry_ptr is NULL!!");
+        if(entry_ptr->me_value == NULL) printf("me_value is NULL");
+        combined_index ++;
         key = entry_ptr->me_key;
     }
-    di->di_pos = i+1;
+    di->di_pos = i + 1;
     di->len--;
     Py_INCREF(key);
+
     return key;
 
 fail:
