@@ -109,10 +109,7 @@ converting the dict to the combined table.
  */
 #define PyDict_MINSIZE 8
 
-#include <assert.h>
 #include <include/Python.h>
-#include <python2.7/dictobject.h>
-#include <Include/Python.h>
 #include "Python.h"
 #include "dict-common.h"
 #include "stringlib/eq.h"    /* to get unicode_eq() */
